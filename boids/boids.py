@@ -9,20 +9,20 @@ class Boid:
     WIDTH = 20
     HEIGHT = 30
     VELOCITY = 10
-    NEAREST_COUNT = 5
-    REPULSION = 20
-    ALIGNMENT = 10
-    BORDER_REPULSION = 500
-    BORDER_TRESHOLD = 70
-    MAX_VELOCITY = 25
+
+    NEAREST_COUNT = 49
+    REPULSION = 60000
+    ALIGNMENT = 3
+    COHESION = 1
+    BORDER_REPULSION = 7
+    BORDER_TRESHOLD = 80
+    MAX_VELOCITY = 40
 
     def __init__(self):
         self.x = random.randint(0, screen.width)
         self.y = random.randint(0, screen.height)
         self.velx = random.randint(-self.VELOCITY, self.VELOCITY)
         self.vely = random.randint(-self.VELOCITY, self.VELOCITY)
-        self.accx = 0
-        self.accy = 0
         self.angle = 0
 
         self.orig_surf = pg.Surface((self.HEIGHT, self.WIDTH))
@@ -36,47 +36,62 @@ class Boid:
         nearest = sorted(boids, key=self.distance_to)[:self.NEAREST_COUNT]
         direction_sum_x = 0
         direction_sum_y = 0
-        self.accx = 0
-        self.accy = 0
+        sum_x = 0
+        sum_y = 0
+        accx = 0
+        accy = 0
 
-        for b in nearest:
-            if self.distance_to(b) == 0:
+        for other in nearest:
+            if other == self:
                 continue
 
             # Compute average direction of neighbors
-            b_direction = pg.Vector2(b.velx, b.vely).normalize()
-            direction_sum_x += b_direction.x
-            direction_sum_y += b_direction.y
+            other_vel = other.get_velocity()
+            if other_vel != 0:
+                direction_sum_x += other.velx / other_vel
+                direction_sum_y += other.vely / other_vel
+
+            # Compute average position of neighbors
+            sum_x += other.x
+            sum_y += other.y
 
             # Add repulsion force from neighbors
-            repulsion_force = self.REPULSION * 10000 / self.distance_to(b)
-            angle_to_b = math.atan2((b.y - self.y), (self.x - b.x))
-
-            self.accx = repulsion_force * math.cos(angle_to_b)
-            self.accy = repulsion_force * math.sin(angle_to_b)
+            dist_to_other = self.distance_to(other)
+            if dist_to_other != 0:
+                repulsion_force = self.REPULSION / self.distance_to(other)
+                accx += repulsion_force * ((self.x - other.x) / self.distance_to(other))
+                accy += repulsion_force * ((other.y - self.y) / self.distance_to(other))
 
         # Add alignment force
-        self.accx += self.ALIGNMENT * direction_sum_x / self.NEAREST_COUNT
-        self.accy += self.ALIGNMENT * direction_sum_y / self.NEAREST_COUNT
+        accx += self.ALIGNMENT * direction_sum_x / self.NEAREST_COUNT
+        accy += self.ALIGNMENT * direction_sum_y / self.NEAREST_COUNT
+
+        # Add cohesion force
+        avg_x = sum_x / self.NEAREST_COUNT
+        avg_y = sum_y / self.NEAREST_COUNT
+        dist_to_avg = math.sqrt((avg_x - self.x) ** 2 + (avg_y - self.y) ** 2)
+        accx += self.COHESION * ((avg_x - self.x) / dist_to_avg)
+        accy += self.COHESION * ((self.y - avg_y) / dist_to_avg)
 
         # Add repulsion force from borders
-        dist_to_right = screen.width - self.x
-        if 0 < dist_to_right < self.BORDER_TRESHOLD:
-            self.accx -= self.BORDER_REPULSION / dist_to_right
-        elif 0 < self.x < self.BORDER_TRESHOLD:
-            self.accx += self.BORDER_REPULSION / self.x
+        if screen.width - self.x < self.BORDER_TRESHOLD:
+            accx -= self.BORDER_REPULSION
+        elif self.x < self.BORDER_TRESHOLD:
+            accx += self.BORDER_REPULSION
 
-        dist_to_bottom = screen.height - self.y
-        if 0 < dist_to_bottom < self.BORDER_TRESHOLD:
-            self.accy += self.BORDER_REPULSION / dist_to_bottom
-        elif 0 < self.y < self.BORDER_TRESHOLD:
-            self.accy -= self.BORDER_REPULSION / self.y
+        if screen.height - self.y < self.BORDER_TRESHOLD:
+            accy += self.BORDER_REPULSION
+        elif self.y < self.BORDER_TRESHOLD:
+            accy -= self.BORDER_REPULSION
 
-        self.velx += self.accx * delta_time
-        self.vely += self.accy * delta_time
+        self.velx += accx
+        self.vely += accy
 
-        self.velx = pg.Vector2(self.velx, self.vely).clamp_magnitude(self.MAX_VELOCITY).x
-        self.vely = pg.Vector2(self.velx, self.vely).clamp_magnitude(self.MAX_VELOCITY).y
+        # Limit the velocity magnitude
+        velocity = self.get_velocity()
+        if velocity > self.MAX_VELOCITY:
+            self.velx = (self.velx / velocity) * self.MAX_VELOCITY
+            self.vely = (self.vely / velocity) * self.MAX_VELOCITY
 
         self.x += self.velx * delta_time
         self.y -= self.vely * delta_time
@@ -85,6 +100,9 @@ class Boid:
     # Distance between this boid and another (squared)
     def distance_to(self, other):
         return (other.x - self.x) ** 2 + (other.y - self.y) ** 2
+
+    def get_velocity(self):
+        return math.sqrt(self.velx ** 2 + self.vely ** 2)
 
     def draw(self):
         # Rotate the surface around its center
