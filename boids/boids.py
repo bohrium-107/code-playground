@@ -8,9 +8,13 @@ class Boid:
     COLOR = pg.color.Color('white')
     WIDTH = 20
     HEIGHT = 30
-    VELOCITY = 20
+    VELOCITY = 10
     NEAREST_COUNT = 5
     REPULSION = 20
+    ALIGNMENT = 10
+    BORDER_REPULSION = 500
+    BORDER_TRESHOLD = 70
+    MAX_VELOCITY = 25
 
     def __init__(self):
         self.x = random.randint(0, screen.width)
@@ -30,19 +34,50 @@ class Boid:
 
     def update(self):
         nearest = sorted(boids, key=self.distance_to)[:self.NEAREST_COUNT]
+        direction_sum_x = 0
+        direction_sum_y = 0
+        self.accx = 0
+        self.accy = 0
 
         for b in nearest:
             if self.distance_to(b) == 0:
                 continue
 
+            # Compute average direction of neighbors
+            b_direction = pg.Vector2(b.velx, b.vely).normalize()
+            direction_sum_x += b_direction.x
+            direction_sum_y += b_direction.y
+
+            # Add repulsion force from neighbors
             repulsion_force = self.REPULSION * 10000 / self.distance_to(b)
-            angle_to_b = math.atan2((b.y - self.y), -(b.x - self.x))
+            angle_to_b = math.atan2((b.y - self.y), (self.x - b.x))
 
             self.accx = repulsion_force * math.cos(angle_to_b)
             self.accy = repulsion_force * math.sin(angle_to_b)
 
+        # Add alignment force
+        self.accx += self.ALIGNMENT * direction_sum_x / self.NEAREST_COUNT
+        self.accy += self.ALIGNMENT * direction_sum_y / self.NEAREST_COUNT
+
+        # Add repulsion force from borders
+        dist_to_right = screen.width - self.x
+        if 0 < dist_to_right < self.BORDER_TRESHOLD:
+            self.accx -= self.BORDER_REPULSION / dist_to_right
+        elif 0 < self.x < self.BORDER_TRESHOLD:
+            self.accx += self.BORDER_REPULSION / self.x
+
+        dist_to_bottom = screen.height - self.y
+        if 0 < dist_to_bottom < self.BORDER_TRESHOLD:
+            self.accy += self.BORDER_REPULSION / dist_to_bottom
+        elif 0 < self.y < self.BORDER_TRESHOLD:
+            self.accy -= self.BORDER_REPULSION / self.y
+
         self.velx += self.accx * delta_time
         self.vely += self.accy * delta_time
+
+        self.velx = pg.Vector2(self.velx, self.vely).clamp_magnitude(self.MAX_VELOCITY).x
+        self.vely = pg.Vector2(self.velx, self.vely).clamp_magnitude(self.MAX_VELOCITY).y
+
         self.x += self.velx * delta_time
         self.y -= self.vely * delta_time
         self.angle = math.degrees(math.atan2(self.vely, self.velx))
