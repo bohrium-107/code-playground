@@ -9,11 +9,17 @@ class Boid:
     WIDTH = 20
     HEIGHT = 30
     VELOCITY = 20
+    NEAREST_COUNT = 5
+    REPULSION = 20
 
     def __init__(self):
         self.x = random.randint(0, screen.width)
         self.y = random.randint(0, screen.height)
-        self.angle = random.randint(0, 359)
+        self.velx = random.randint(-self.VELOCITY, self.VELOCITY)
+        self.vely = random.randint(-self.VELOCITY, self.VELOCITY)
+        self.accx = 0
+        self.accy = 0
+        self.angle = 0
 
         self.orig_surf = pg.Surface((self.HEIGHT, self.WIDTH))
         self.orig_surf.set_colorkey(pg.color.Color('black'))
@@ -23,8 +29,27 @@ class Boid:
         pg.gfxdraw.filled_trigon(self.orig_surf, 0, 1, 0, self.WIDTH - 1, self.HEIGHT - 2, self.WIDTH // 2, self.COLOR)
 
     def update(self):
-        self.x += math.cos(math.radians(self.angle)) * self.VELOCITY * delta_time
-        self.y -= math.sin(math.radians(self.angle)) * self.VELOCITY * delta_time
+        nearest = sorted(boids, key=self.distance_to)[:self.NEAREST_COUNT]
+
+        for b in nearest:
+            if self.distance_to(b) == 0:
+                continue
+
+            repulsion_force = self.REPULSION * 10000 / self.distance_to(b)
+            angle_to_b = math.atan2((b.y - self.y), -(b.x - self.x))
+
+            self.accx = repulsion_force * math.cos(angle_to_b)
+            self.accy = repulsion_force * math.sin(angle_to_b)
+
+        self.velx += self.accx * delta_time
+        self.vely += self.accy * delta_time
+        self.x += self.velx * delta_time
+        self.y -= self.vely * delta_time
+        self.angle = math.degrees(math.atan2(self.vely, self.velx))
+
+    # Distance between this boid and another (squared)
+    def distance_to(self, other):
+        return (other.x - self.x) ** 2 + (other.y - self.y) ** 2
 
     def draw(self):
         # Rotate the surface around its center
@@ -34,12 +59,13 @@ class Boid:
 
 # Setup
 pg.init()
-screen = pg.display.set_mode((900, 700))
+screen = pg.display.set_mode((1000, 800))
 running = True
 delta_time = 0.1
 clock = pg.time.Clock()
 
-boids = [Boid()]
+COUNT = 50
+boids = [Boid() for _ in range(COUNT)]
 
 while running:
     screen.fill(globals.bg_color)
@@ -58,7 +84,6 @@ while running:
             running = False
         if event.type == pg.KEYDOWN:
             if event.key == pg.K_r:
-                boids.clear()
-                boids.append(Boid())
+                boids = [Boid() for _ in range(COUNT)]
 
 pg.quit()
