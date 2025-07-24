@@ -6,23 +6,23 @@ import globals
 
 class Boid:
     COLOR = pg.color.Color('white')
-    WIDTH = 20
-    HEIGHT = 30
-    VELOCITY = 10
+    WIDTH = 15
+    HEIGHT = 25
+    START_VEL = 10
 
-    NEAREST_COUNT = 49
-    REPULSION = 60000
-    ALIGNMENT = 3
-    COHESION = 1
-    BORDER_REPULSION = 7
-    BORDER_TRESHOLD = 80
-    MAX_VELOCITY = 40
+    VIEW_RADIUS = 140
+    SEPARATION = 8
+    ALIGNMENT = 2
+    COHESION = 2
+    BORDER_REPULSION = 5
+    BORDER_TRESHOLD = 90
+    MAX_VELOCITY = 50
 
     def __init__(self):
         self.x = random.randint(0, screen.width)
         self.y = random.randint(0, screen.height)
-        self.velx = random.randint(-self.VELOCITY, self.VELOCITY)
-        self.vely = random.randint(-self.VELOCITY, self.VELOCITY)
+        self.velx = random.randint(-self.START_VEL, self.START_VEL)
+        self.vely = random.randint(-self.START_VEL, self.START_VEL)
         self.angle = 0
 
         self.orig_surf = pg.Surface((self.HEIGHT, self.WIDTH))
@@ -33,7 +33,8 @@ class Boid:
         pg.gfxdraw.filled_trigon(self.orig_surf, 0, 1, 0, self.WIDTH - 1, self.HEIGHT - 2, self.WIDTH // 2, self.COLOR)
 
     def update(self):
-        nearest = sorted(boids, key=self.distance_to)[:self.NEAREST_COUNT]
+        nearest = list(filter(lambda x: self.distance_to(x) <= self.VIEW_RADIUS, boids))
+
         direction_sum_x = 0
         direction_sum_y = 0
         sum_x = 0
@@ -58,20 +59,21 @@ class Boid:
             # Add repulsion force from neighbors
             dist_to_other = self.distance_to(other)
             if dist_to_other != 0:
-                repulsion_force = self.REPULSION / self.distance_to(other)
+                repulsion_force = self.SEPARATION / self.distance_to(other)
                 accx += repulsion_force * ((self.x - other.x) / self.distance_to(other))
                 accy += repulsion_force * ((other.y - self.y) / self.distance_to(other))
 
-        # Add alignment force
-        accx += self.ALIGNMENT * direction_sum_x / self.NEAREST_COUNT
-        accy += self.ALIGNMENT * direction_sum_y / self.NEAREST_COUNT
+        if len(nearest) > 1:
+            # Add alignment force
+            accx += self.ALIGNMENT * direction_sum_x / len(nearest)
+            accy += self.ALIGNMENT * direction_sum_y / len(nearest)
 
-        # Add cohesion force
-        avg_x = sum_x / self.NEAREST_COUNT
-        avg_y = sum_y / self.NEAREST_COUNT
-        dist_to_avg = math.sqrt((avg_x - self.x) ** 2 + (avg_y - self.y) ** 2)
-        accx += self.COHESION * ((avg_x - self.x) / dist_to_avg)
-        accy += self.COHESION * ((self.y - avg_y) / dist_to_avg)
+            # Add cohesion force
+            avg_x = sum_x / len(nearest)
+            avg_y = sum_y / len(nearest)
+            dist_to_avg = math.sqrt((avg_x - self.x) ** 2 + (avg_y - self.y) ** 2)
+            accx += self.COHESION * ((avg_x - self.x) / dist_to_avg)
+            accy += self.COHESION * ((self.y - avg_y) / dist_to_avg)
 
         # Add repulsion force from borders
         if screen.width - self.x < self.BORDER_TRESHOLD:
@@ -97,9 +99,9 @@ class Boid:
         self.y -= self.vely * delta_time
         self.angle = math.degrees(math.atan2(self.vely, self.velx))
 
-    # Distance between this boid and another (squared)
+    # Distance between this boid and another
     def distance_to(self, other):
-        return (other.x - self.x) ** 2 + (other.y - self.y) ** 2
+        return math.sqrt((other.x - self.x) ** 2 + (other.y - self.y) ** 2)
 
     def get_velocity(self):
         return math.sqrt(self.velx ** 2 + self.vely ** 2)
@@ -112,6 +114,7 @@ class Boid:
 
 # Setup
 pg.init()
+pg.display.set_caption('Boids')
 screen = pg.display.set_mode((1000, 800))
 running = True
 delta_time = 0.1
