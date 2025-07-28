@@ -1,8 +1,7 @@
 import pygame as pg
 from itertools import groupby
 import json
-
-from globals import InputBox
+from globals import InputBox, EventManager
 
 
 class Grid:
@@ -95,14 +94,43 @@ def draw_grid():
     pg.draw.rect(screen, GRID_BORDER_COL,
                  (grid_rect.x, grid_rect.y, BOX_LENGTH * GRID_SIZE, BOX_LENGTH * GRID_SIZE), 3)
 
+def on_quit(e):
+    global running
+    running = False
+
 def on_mouse_down(e):
     global pressed
     pressed = e.button
 
-def on_mouse_up():
+def on_mouse_up(e):
     global pressed, first_changed_state
     pressed = 0
     first_changed_state = None
+
+def on_key_down(e):
+    if e.key == pg.K_r and len(sprites) == 0:
+        kill_all_sprites()
+        new_inputbox = InputBox(screen.get_rect().center,
+                                'Size of the new grid:',
+                                event_manager,
+                                lambda: create_empty_grid(int(new_inputbox.text)))
+        sprites.add(new_inputbox)
+    elif e.key == pg.K_s and len(sprites) == 0:
+        kill_all_sprites()
+        new_inputbox = InputBox(screen.get_rect().center,
+                                'Save grid as:',
+                                event_manager,
+                                lambda: save_grid(new_inputbox.text))
+        sprites.add(new_inputbox)
+    elif e.key == pg.K_l and len(sprites) == 0:
+        kill_all_sprites()
+        new_inputbox = InputBox(screen.get_rect().center,
+                                'Name of the grid to load:',
+                                event_manager,
+                                lambda: load_grid(new_inputbox.text))
+        sprites.add(new_inputbox)
+    elif e.key == pg.K_ESCAPE:
+        kill_all_sprites()
 
 def on_mouse_pressed():
     mousex, mousey = pg.mouse.get_pos()
@@ -151,6 +179,11 @@ def save_grid(name):
     with open(f'grids/{name}.json', 'w') as file:
         json.dump(grid.matrix, file)
 
+def kill_all_sprites():
+    for sprite in sprites:
+        sprite.kill()
+
+
 # Setup
 pg.init()
 pg.display.set_caption('Nonogram')
@@ -159,20 +192,31 @@ running = True
 delta_time = 0.1
 clock = pg.time.Clock()
 
-MARGIN_BOTTOMRIGHT = 90
-MARGIN_TOPLEFT = 90
-
 pressed = 0  # Mouse button currently being pressed
 first_changed_state = None  # State of the box over which the current mouse press began
 grid_created = False
 
-# Colors
+# Constants
+MARGIN_BOTTOMRIGHT = 90
+MARGIN_TOPLEFT = 90
 GRID_BG_COL = (190, 190, 190)
 LINE_COL = (150, 150, 150)
 THICK_LINE_COL = (130, 130, 130)
 GRID_BORDER_COL = (10, 10, 10)
 
-input_box = InputBox(screen.get_rect().center, 'Size of the grid:', 'create_grid')
+# Add event listeners
+event_manager = EventManager()
+event_manager.add_listener(pg.QUIT, on_quit)
+event_manager.add_listener(pg.MOUSEBUTTONDOWN, on_mouse_down)
+event_manager.add_listener(pg.MOUSEBUTTONUP, on_mouse_up)
+event_manager.add_listener(pg.KEYDOWN, on_key_down)
+
+sprites = pg.sprite.Group()
+new_inputbox = InputBox(screen.get_rect().center,
+                        'Size of the new grid:',
+                        event_manager,
+                        lambda: create_empty_grid(int(new_inputbox.text)))
+sprites.add(new_inputbox)
 
 while running:
     screen.fill(pg.color.Color('white'))
@@ -180,52 +224,21 @@ while running:
     if grid_created:
         draw_grid()
 
-    if input_box:
-        screen.blit(input_box.image, input_box.rect)
+    sprites.update()
+    sprites.draw(screen)
 
     screen.blit(pg.Font(None, 25).render(
-        'r to create a new grid, s to save grid to a file, l to load a grid from a file, \nESC to close input box', True, 'black'), (20, 20))
+        'r to create a new grid, s to save grid to a file, l to load a grid from a file, \nESC to close input box',
+        True, 'black'), (20, 20))
+
+    if grid_created and pressed:
+        on_mouse_pressed()
 
     delta_time = clock.tick(60) / 100
     delta_time = min(1.0, delta_time)
 
-    for event in pg.event.get():
-        if event.type == pg.QUIT:
-            running = False
-        elif event.type == pg.KEYDOWN:
-            if input_box:
-                input_box.on_key_down(event)
-
-            if event.key == pg.K_RETURN and input_box:
-                if input_box.tag == 'create_grid':
-                    create_empty_grid(int(input_box.text))
-                elif input_box.tag == 'save_grid':
-                    save_grid(input_box.text)
-                elif input_box.tag == 'load_grid':
-                    load_grid(input_box.text)
-                input_box = None
-
-            elif event.key == pg.K_r and not input_box:
-                input_box = InputBox(screen.get_rect().center, 'Size of the new grid:', 'create_grid')
-            elif event.key == pg.K_s and not input_box:
-                input_box = InputBox(screen.get_rect().center, 'Save grid as:', 'save_grid')
-            elif event.key == pg.K_l and not input_box:
-                input_box = InputBox(screen.get_rect().center, 'Name of the grid to load:', 'load_grid')
-            elif event.key == pg.K_ESCAPE:
-                input_box = None
-        elif event.type == pg.TEXTINPUT:
-            if input_box:
-                input_box.on_text_input(event)
-        elif event.type == pg.MOUSEBUTTONDOWN:
-            if grid_created:
-                on_mouse_down(event)
-        elif event.type == pg.MOUSEBUTTONUP:
-            if grid_created:
-                on_mouse_up()
+    event_manager.manage_events()
 
     pg.display.flip()
-
-    if pressed:
-        on_mouse_pressed()
 
 pg.quit()
