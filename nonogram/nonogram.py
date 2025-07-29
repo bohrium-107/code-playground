@@ -98,9 +98,10 @@ def draw_grid():
                  (grid.rect.x, grid.rect.y, box_length * grid_size, box_length * grid_size), 3)
 
     # Draw guides
-    font = pg.font.Font(None, 600 // (grid_size + 10))
-    spacing_hor = 23
-    spacing_vert = 27
+    font_size = box_length * 32 // 48
+    font = pg.font.Font(None, font_size)
+    spacing_hor = font_size * 0.8
+    spacing_vert = font_size
 
     for i in range(grid_size):
         nums = solution.row_guides[i]
@@ -183,16 +184,17 @@ def on_mouse_pressed():
 
 
 def load_grid(name):
-    global grid, solution, grid_size, box_length, margin_topleft
+    global grid, solution, grid_size, box_length, margin_topleft, won
 
     with open(f'grids/{name}.json') as file:
         solution = Grid(json.load(file))
 
     grid_size = len(solution.matrix)
-    margin_topleft = -5250 // (grid_size - 45)
+    margin_topleft = 170 + grid_size * 0.1
     box_length = int((screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size)
     grid = Grid([[0] * grid_size for _ in range(grid_size)],
                 pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
+    won = False
 
 
 def on_load_button_pressed():
@@ -216,17 +218,18 @@ def on_random_button_pressed():
 
 
 def create_random_grid(size):
-    global grid, solution, grid_size, box_length, margin_topleft
+    global grid, solution, grid_size, box_length, margin_topleft, won
 
     grid_size = size
-    margin_topleft = -5250 // (grid_size - 45)
+    margin_topleft = 170 + grid_size * 0.1
     box_length = int((screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size)
     grid = Grid([[0] * grid_size for _ in range(grid_size)],
                 pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
     solution = Grid([[0] * grid_size for _ in range(grid_size)],
-                pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
+                    pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
+    won = False
 
-    density = 0.7
+    density = 0.65
     random_boxes = random.sample(list(product(range(size), repeat=2)), int((grid_size ** 2) * density))
     for box in random_boxes:
         solution.set_box(box[0], box[1], 1)
