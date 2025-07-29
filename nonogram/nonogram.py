@@ -1,7 +1,9 @@
 import json
 import pygame as pg
-from itertools import groupby
-from globals import EventManager
+from itertools import groupby, product
+from globals import EventManager, Button, InputBox
+import random
+
 
 class Grid:
     def __init__(self, matrix, rect=pg.Rect(0, 0, 0, 0)):
@@ -55,6 +57,7 @@ class Grid:
         self.matrix[row][col] = state
         self.row_guides = self._get_row_guides()
         self.col_guides = self._get_col_guides()
+
 
 def draw_grid():
     # Draw grid boxes
@@ -123,6 +126,7 @@ def draw_grid():
                                            centerx=grid.rect.left + box_length / 2 + i * box_length)
             screen.blit(text_surf, text_rect)
 
+
 def is_grid_solved():
     for i in range(grid_size):
         if not grid.row_guides[i] == solution.row_guides[i] or not grid.col_guides[i] == solution.col_guides[i]:
@@ -130,18 +134,27 @@ def is_grid_solved():
 
     return True
 
+
 def on_quit(e):
     global running
     running = False
 
+
 def on_mouse_down(e):
-    global pressed
-    pressed = e.button
+    global mb_pressed
+    mb_pressed = e.button
+
 
 def on_mouse_up(e):
-    global pressed, first_changed_state
-    pressed = 0
+    global mb_pressed, first_changed_state
+    mb_pressed = 0
     first_changed_state = None
+
+
+def on_key_down(e):
+    if e.key == pg.K_ESCAPE:
+        kill_sprites_with_tag('inputbox')
+
 
 def on_mouse_pressed():
     mousex, mousey = pg.mouse.get_pos()
@@ -165,8 +178,9 @@ def on_mouse_pressed():
             first_changed_state = box_state
 
         # Only change state if this box has the same state as the box changed first with this mouse press
-        if (pressed, box_state) in toggle_map and box_state == first_changed_state:
-            grid.set_box(row, col, toggle_map[(pressed, box_state)])
+        if (mb_pressed, box_state) in toggle_map and box_state == first_changed_state:
+            grid.set_box(row, col, toggle_map[(mb_pressed, box_state)])
+
 
 def load_grid(name):
     global grid, solution, grid_size, box_length, margin_topleft
@@ -180,6 +194,50 @@ def load_grid(name):
     grid = Grid([[0] * grid_size for _ in range(grid_size)],
                 pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
 
+
+def on_load_button_pressed():
+    kill_sprites_with_tag('inputbox')
+    load_input_box = InputBox(screen.get_rect().center,
+                              'Name of the grid to load:',
+                              lambda: load_grid(load_input_box.text),
+                              event_manager,
+                              'inputbox')
+    sprites.add(load_input_box)
+
+
+def on_random_button_pressed():
+    kill_sprites_with_tag('inputbox')
+    random_input_box = InputBox(screen.get_rect().center,
+                                'Size of the grid:',
+                                lambda: create_random_grid(int(random_input_box.text)),
+                                event_manager,
+                                'inputbox')
+    sprites.add(random_input_box)
+
+
+def create_random_grid(size):
+    global grid, solution, grid_size, box_length, margin_topleft
+
+    grid_size = size
+    margin_topleft = -5250 // (grid_size - 45)
+    box_length = int((screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size)
+    grid = Grid([[0] * grid_size for _ in range(grid_size)],
+                pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
+    solution = Grid([[0] * grid_size for _ in range(grid_size)],
+                pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
+
+    density = 0.7
+    random_boxes = random.sample(list(product(range(size), repeat=2)), int((grid_size ** 2) * density))
+    for box in random_boxes:
+        solution.set_box(box[0], box[1], 1)
+
+
+def kill_sprites_with_tag(tag):
+    for sprite in sprites:
+        if sprite.tag == tag:
+            sprite.kill()
+
+
 # Initial setup
 pg.init()
 pg.display.set_caption('Nonogram')
@@ -188,12 +246,12 @@ running = True
 delta_time = 0.1
 clock = pg.time.Clock()
 
-pressed = 0  # Mouse button currently being pressed
+mb_pressed = 0  # Mouse button currently being pressed
 first_changed_state = None  # State of the box over which the current mouse press began
 won = False
 
 # Constants
-MARGIN_BOTTOMRIGHT = 50
+MARGIN_BOTTOMRIGHT = 65
 GRID_BG_COL = (190, 190, 190)
 LINE_COL = (150, 150, 150)
 THICK_LINE_COL = (130, 130, 130)
@@ -204,12 +262,20 @@ event_manager = EventManager()
 event_manager.add_listener(pg.QUIT, on_quit)
 event_manager.add_listener(pg.MOUSEBUTTONDOWN, on_mouse_down)
 event_manager.add_listener(pg.MOUSEBUTTONUP, on_mouse_up)
+event_manager.add_listener(pg.KEYDOWN, on_key_down)
 
-load_grid('apple')
+# UI
+sprites = pg.sprite.Group()
+sprites.add(Button((75, screen.height - 33), on_load_button_pressed, 'Load grid', event_manager))
+sprites.add(Button((210, screen.height - 33), on_random_button_pressed, 'Random grid', event_manager))
+
+create_random_grid(10)
 
 while running:
     screen.fill(pg.color.Color('white'))
     draw_grid()
+    sprites.update()
+    sprites.draw(screen)
     pg.display.flip()
 
     # Check if the grid is solved
@@ -218,7 +284,7 @@ while running:
             won = True
             pg.display.message_box('Solved', 'Grid solved!')  # TODO: Placeholder
 
-    if pressed:
+    if mb_pressed:
         on_mouse_pressed()
 
     event_manager.manage_events()

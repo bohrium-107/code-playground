@@ -99,38 +99,41 @@ def on_quit(e):
     running = False
 
 def on_mouse_down(e):
-    global pressed
-    pressed = e.button
+    global mb_pressed
+    mb_pressed = e.button
 
 def on_mouse_up(e):
-    global pressed, first_changed_state
-    pressed = 0
+    global mb_pressed, first_changed_state
+    mb_pressed = 0
     first_changed_state = None
 
 def on_key_down(e):
     if e.key == pg.K_r and len(sprites) == 0:
-        kill_all_sprites()
+        kill_sprites_with_tag('inputbox')
         new_inputbox = InputBox(screen.get_rect().center,
                                 'Size of the new grid:',
+                                lambda: create_empty_grid(int(new_inputbox.text)),
                                 event_manager,
-                                lambda: create_empty_grid(int(new_inputbox.text)))
+                                'inputbox')
         sprites.add(new_inputbox)
     elif e.key == pg.K_s and len(sprites) == 0:
-        kill_all_sprites()
+        kill_sprites_with_tag('inputbox')
         new_inputbox = InputBox(screen.get_rect().center,
                                 'Save grid as:',
+                                lambda: save_grid(new_inputbox.text),
                                 event_manager,
-                                lambda: save_grid(new_inputbox.text))
+                                'inputbox')
         sprites.add(new_inputbox)
     elif e.key == pg.K_l and len(sprites) == 0:
-        kill_all_sprites()
+        kill_sprites_with_tag('inputbox')
         new_inputbox = InputBox(screen.get_rect().center,
                                 'Name of the grid to load:',
+                                lambda: load_grid(new_inputbox.text),
                                 event_manager,
-                                lambda: load_grid(new_inputbox.text))
+                                'inputbox')
         sprites.add(new_inputbox)
     elif e.key == pg.K_ESCAPE:
-        kill_all_sprites()
+        kill_sprites_with_tag('inputbox')
 
 def on_mouse_pressed():
     mousex, mousey = pg.mouse.get_pos()
@@ -152,8 +155,8 @@ def on_mouse_pressed():
             first_changed_state = box_state
 
         # Only change state if this box has the same state as the box changed first with this mouse press
-        if (pressed, box_state) in toggle_map and box_state == first_changed_state:
-            grid.set_box(row, col, toggle_map[(pressed, box_state)])
+        if (mb_pressed, box_state) in toggle_map and box_state == first_changed_state:
+            grid.set_box(row, col, toggle_map[(mb_pressed, box_state)])
 
 def load_grid(name):
     global BOX_LENGTH, GRID_SIZE, grid, grid_rect, grid_created
@@ -179,9 +182,10 @@ def save_grid(name):
     with open(f'grids/{name}.json', 'w') as file:
         json.dump(grid.matrix, file)
 
-def kill_all_sprites():
+def kill_sprites_with_tag(tag):
     for sprite in sprites:
-        sprite.kill()
+        if sprite.tag == tag:
+            sprite.kill()
 
 
 # Setup
@@ -192,7 +196,7 @@ running = True
 delta_time = 0.1
 clock = pg.time.Clock()
 
-pressed = 0  # Mouse button currently being pressed
+mb_pressed = 0  # Mouse button currently being pressed
 first_changed_state = None  # State of the box over which the current mouse press began
 grid_created = False
 
@@ -214,8 +218,9 @@ event_manager.add_listener(pg.KEYDOWN, on_key_down)
 sprites = pg.sprite.Group()
 new_inputbox = InputBox(screen.get_rect().center,
                         'Size of the new grid:',
+                        lambda: create_empty_grid(int(new_inputbox.text)),
                         event_manager,
-                        lambda: create_empty_grid(int(new_inputbox.text)))
+                        'inputbox')
 sprites.add(new_inputbox)
 
 while running:
@@ -231,7 +236,7 @@ while running:
         'r to create a new grid, s to save grid to a file, l to load a grid from a file, \nESC to close input box',
         True, 'black'), (20, 20))
 
-    if grid_created and pressed:
+    if grid_created and mb_pressed:
         on_mouse_pressed()
 
     delta_time = clock.tick(60) / 100

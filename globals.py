@@ -27,7 +27,7 @@ class InputBox(pg.sprite.Sprite):
     BOX_COLOR = (80, 80, 80)
     BOX_COLOR_LIGHT = (110, 110, 110)
 
-    def __init__(self, position, tooltip, event_manager, on_enter, tag='', width=300, height=80):
+    def __init__(self, position, tooltip, on_enter, event_manager, tag='', width=300, height=80):
         super().__init__()
         self.image = pg.Surface((width, height))
         self.rect = self.image.get_rect(center=position)
@@ -75,3 +75,38 @@ class InputBox(pg.sprite.Sprite):
         elif event.key == pg.K_RETURN:
             self.on_enter()
             self.kill()
+
+class Button(pg.sprite.Sprite):
+    font = None
+    BG_COLOR = (90, 90, 90)
+    BORDER_COLOR = (20, 20, 20)
+
+    def __init__(self, position, on_click, text, event_manager, tag='', width=None, height=40):
+        super().__init__()
+        self.font = pg.font.Font(None, 25)
+        self.text = text
+        self.tag = tag
+        self.on_click = on_click
+        self.event_manager = event_manager
+
+        if width is not None:
+            self.image = pg.Surface((width, height))
+            self.image.fill(pg.Color(self.BG_COLOR))
+        else:
+            text_surf = self.font.render(self.text, True, 'white')
+            self.image = pg.Surface((text_surf.width + 30, height))
+            self.image.fill(pg.Color(self.BG_COLOR))
+            self.image.blit(text_surf, text_surf.get_rect(center=(self.image.width / 2, self.image.height / 2)))
+
+        self.rect = self.image.get_rect(center=position)
+        pg.draw.rect(self.image, self.BORDER_COLOR, self.image.get_rect(topleft=(0, 0)), width=2)
+
+        self.event_manager.add_listener(pg.MOUSEBUTTONDOWN, self.on_mousebutton_down)
+
+    def kill(self):
+        super().kill()
+        self.event_manager.remove_listener(self.on_mousebutton_down)
+
+    def on_mousebutton_down(self, event):
+        if event.button == 1 and self.rect.collidepoint(pg.mouse.get_pos()):
+            self.on_click()
