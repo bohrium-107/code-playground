@@ -1,7 +1,7 @@
 import pygame as pg
 from itertools import groupby
 import json
-from globals import InputBox, EventManager
+from ui import InputBox, EventManager
 
 
 class Grid:

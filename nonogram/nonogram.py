@@ -1,9 +1,8 @@
 import json
 import time
-
 import pygame as pg
 from itertools import groupby, product
-from globals import EventManager, Button, InputBox
+from ui import EventManager, Button, InputBox, get_ui_font
 import random
 
 
@@ -72,7 +71,8 @@ def draw_grid():
             elif grid.get_box(i, j) == 1:
                 pg.draw.rect(screen, GRID_BORDER_COL, box_rect)
             elif grid.get_box(i, j) == 2:
-                pg.draw.rect(screen, pg.Color('red'), box_rect)  # TODO: Placeholder
+                pg.draw.rect(screen, GRID_BG_COL, box_rect)
+                screen.blit(cross_image, box_rect)
 
     # Draw grid lines
     for i in range(grid_size - 1):
@@ -101,7 +101,7 @@ def draw_grid():
 
     # Draw guides
     font_size = box_length * 22 // 48
-    guides_font = pg.font.Font(pg.font.get_default_font(), font_size)  # TODO: Placeholder font
+    guides_font = pg.font.Font('segoeui.ttf', font_size)
     spacing_hor = font_size * 1.2
     spacing_vert = font_size * 1.5
 
@@ -186,18 +186,19 @@ def on_mouse_pressed():
 
 
 def load_grid(name):
-    global grid, solution, grid_size, box_length, margin_topleft, won, grid_name, start_time
+    global grid, solution, grid_size, box_length, margin_topleft, won, grid_name, start_time, cross_image
 
     with open(f'grids/{name}.json') as file:
         solution = Grid(json.load(file))
 
     grid_size = len(solution.matrix)
-    margin_topleft = 190 + grid_size * 0.1
+    margin_topleft = 200 + grid_size * 0.1
     box_length = int((screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size)
     grid = Grid([[0] * grid_size for _ in range(grid_size)],
                 pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
     won = False
     grid_name = name
+    cross_image = pg.transform.scale(orig_cross_image, (box_length, box_length))
     start_time = time.time()
 
 
@@ -228,10 +229,10 @@ def on_solve_button_pressed():
 
 
 def create_random_grid(size):
-    global grid, solution, grid_size, box_length, margin_topleft, won, grid_name, start_time
+    global grid, solution, grid_size, box_length, margin_topleft, won, grid_name, start_time, cross_image
 
     grid_size = size
-    margin_topleft = 190 + grid_size * 0.1
+    margin_topleft = 200 + grid_size * 0.1
     box_length = int((screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size)
     grid = Grid([[0] * grid_size for _ in range(grid_size)],
                 pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
@@ -239,6 +240,7 @@ def create_random_grid(size):
                     pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
     won = False
     grid_name = ''
+    cross_image = pg.transform.scale(orig_cross_image, (box_length, box_length))
 
     density = 0.7
     random_boxes = random.sample(list(product(range(size), repeat=2)), int((grid_size ** 2) * density))
@@ -261,9 +263,11 @@ screen = pg.display.set_mode((700, 700))
 running = True
 delta_time = 0.1
 clock = pg.time.Clock()
-font = pg.font.Font(pg.font.get_default_font(), 18)  # TODO: Placeholder font
+font = pg.font.Font('segoeui.ttf', 18)
 start_time = time.time()
 elapsed_time = 0
+orig_cross_image = pg.image.load('cross.png').convert_alpha()
+orig_cross_image.set_colorkey('white')
 
 mb_pressed = 0  # Mouse button currently being pressed
 first_changed_state = None  # State of the box over which the current mouse press began
@@ -304,15 +308,15 @@ while running:
 
     if won:
         solved_text = font.render('SOLVED', True, GRID_BORDER_COL)
-        screen.blit(solved_text, solved_text.get_rect(left=screen.get_rect().left + 8, top=8))
+        screen.blit(solved_text, solved_text.get_rect(left=screen.get_rect().left + 8, top=4))
 
     if not won:
         elapsed_time = time.gmtime(time.time() - start_time)
     elapsed_text = font.render(time.strftime('%M:%S', elapsed_time), True, GRID_BORDER_COL)
-    screen.blit(elapsed_text, elapsed_text.get_rect(right=screen.get_rect().right - 8, top=8))
+    screen.blit(elapsed_text, elapsed_text.get_rect(right=screen.get_rect().right - 8, top=4))
 
     name_text = font.render(f'{grid_name}  [{grid_size}x{grid_size}]', True, GRID_BORDER_COL)
-    screen.blit(name_text, name_text.get_rect(centerx=screen.get_rect().centerx, top=8))
+    screen.blit(name_text, name_text.get_rect(centerx=screen.get_rect().centerx, top=4))
 
     pg.display.flip()
 
@@ -320,7 +324,7 @@ while running:
     if not won:
         if is_grid_solved():
             won = True
-            pg.display.message_box('Solved', 'Grid solved!')  # TODO: Placeholder
+            pg.display.message_box('Solved', 'Grid solved!')
 
     if mb_pressed:
         on_mouse_pressed()
