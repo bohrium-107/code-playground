@@ -1,4 +1,6 @@
 import json
+import time
+
 import pygame as pg
 from itertools import groupby, product
 from globals import EventManager, Button, InputBox
@@ -98,10 +100,10 @@ def draw_grid():
                  (grid.rect.x, grid.rect.y, box_length * grid_size, box_length * grid_size), 3)
 
     # Draw guides
-    font_size = box_length * 32 // 48
-    font = pg.font.Font(None, font_size)
-    spacing_hor = font_size * 0.8
-    spacing_vert = font_size
+    font_size = box_length * 22 // 48
+    guides_font = pg.font.Font(pg.font.get_default_font(), font_size)  # TODO: Placeholder font
+    spacing_hor = font_size * 1.2
+    spacing_vert = font_size * 1.5
 
     for i in range(grid_size):
         nums = solution.row_guides[i]
@@ -110,7 +112,7 @@ def draw_grid():
 
         for j in range(len(nums)):
             text = str(nums[-1 - j])
-            text_surf = font.render(text, True, text_color)
+            text_surf = guides_font.render(text, True, text_color)
             text_rect = text_surf.get_rect(right=grid.rect.left - 15 - j * spacing_hor,
                                            centery=grid.rect.top + box_length / 2 + i * box_length)
             screen.blit(text_surf, text_rect)
@@ -122,7 +124,7 @@ def draw_grid():
 
         for j in range(len(nums)):
             text = str(nums[-1 - j])
-            text_surf = font.render(text, True, text_color)
+            text_surf = guides_font.render(text, True, text_color)
             text_rect = text_surf.get_rect(bottom=grid.rect.top - 10 - j * spacing_vert,
                                            centerx=grid.rect.left + box_length / 2 + i * box_length)
             screen.blit(text_surf, text_rect)
@@ -184,17 +186,19 @@ def on_mouse_pressed():
 
 
 def load_grid(name):
-    global grid, solution, grid_size, box_length, margin_topleft, won
+    global grid, solution, grid_size, box_length, margin_topleft, won, grid_name, start_time
 
     with open(f'grids/{name}.json') as file:
         solution = Grid(json.load(file))
 
     grid_size = len(solution.matrix)
-    margin_topleft = 170 + grid_size * 0.1
+    margin_topleft = 190 + grid_size * 0.1
     box_length = int((screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size)
     grid = Grid([[0] * grid_size for _ in range(grid_size)],
                 pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
     won = False
+    grid_name = name
+    start_time = time.time()
 
 
 def on_load_button_pressed():
@@ -217,22 +221,31 @@ def on_random_button_pressed():
     sprites.add(random_input_box)
 
 
+def on_solve_button_pressed():
+    for i in range(grid_size):
+        for j in range(grid_size):
+            grid.set_box(i, j, solution.get_box(i, j))
+
+
 def create_random_grid(size):
-    global grid, solution, grid_size, box_length, margin_topleft, won
+    global grid, solution, grid_size, box_length, margin_topleft, won, grid_name, start_time
 
     grid_size = size
-    margin_topleft = 170 + grid_size * 0.1
+    margin_topleft = 190 + grid_size * 0.1
     box_length = int((screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size)
     grid = Grid([[0] * grid_size for _ in range(grid_size)],
                 pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
     solution = Grid([[0] * grid_size for _ in range(grid_size)],
                     pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
     won = False
+    grid_name = ''
 
-    density = 0.65
+    density = 0.7
     random_boxes = random.sample(list(product(range(size), repeat=2)), int((grid_size ** 2) * density))
     for box in random_boxes:
         solution.set_box(box[0], box[1], 1)
+
+    start_time = time.time()
 
 
 def kill_sprites_with_tag(tag):
@@ -248,10 +261,14 @@ screen = pg.display.set_mode((700, 700))
 running = True
 delta_time = 0.1
 clock = pg.time.Clock()
+font = pg.font.Font(pg.font.get_default_font(), 18)  # TODO: Placeholder font
+start_time = time.time()
+elapsed_time = 0
 
 mb_pressed = 0  # Mouse button currently being pressed
 first_changed_state = None  # State of the box over which the current mouse press began
 won = False
+grid_name = ''
 
 # Constants
 MARGIN_BOTTOMRIGHT = 65
@@ -271,6 +288,7 @@ event_manager.add_listener(pg.KEYDOWN, on_key_down)
 sprites = pg.sprite.Group()
 sprites.add(Button((75, screen.height - 33), on_load_button_pressed, 'Load grid', event_manager))
 sprites.add(Button((210, screen.height - 33), on_random_button_pressed, 'Random grid', event_manager))
+sprites.add(Button((365, screen.height - 33), on_solve_button_pressed, 'Show solution', event_manager))
 
 create_random_grid(10)
 
@@ -279,6 +297,23 @@ while running:
     draw_grid()
     sprites.update()
     sprites.draw(screen)
+
+    # Draw infobar
+    screen.fill(GRID_BG_COL, (0, 0, screen.width, 32))
+    pg.draw.line(screen, THICK_LINE_COL, (0, 32), (screen.width, 32), 2)
+
+    if won:
+        solved_text = font.render('SOLVED', True, GRID_BORDER_COL)
+        screen.blit(solved_text, solved_text.get_rect(left=screen.get_rect().left + 8, top=8))
+
+    if not won:
+        elapsed_time = time.gmtime(time.time() - start_time)
+    elapsed_text = font.render(time.strftime('%M:%S', elapsed_time), True, GRID_BORDER_COL)
+    screen.blit(elapsed_text, elapsed_text.get_rect(right=screen.get_rect().right - 8, top=8))
+
+    name_text = font.render(f'{grid_name}  [{grid_size}x{grid_size}]', True, GRID_BORDER_COL)
+    screen.blit(name_text, name_text.get_rect(centerx=screen.get_rect().centerx, top=8))
+
     pg.display.flip()
 
     # Check if the grid is solved
