@@ -64,7 +64,7 @@ def draw_grid():
     # Draw grid boxes
     for i in range(grid_size):
         for j in range(grid_size):
-            box_rect = (grid.rect.x + j * box_length, grid.rect.y + i * box_length, box_length, box_length)
+            box_rect = (grid.rect.x + j * box_length, grid.rect.y + i * box_length, box_length + 1, box_length + 1)
 
             if grid.get_box(i, j) == 0:
                 pg.draw.rect(screen, GRID_BG_COL, box_rect)
@@ -76,6 +76,7 @@ def draw_grid():
 
     # Draw grid lines
     for i in range(grid_size - 1):
+        pass
         # Vertical line
         pg.draw.line(screen, LINE_COL,
                      (grid.rect.x + (i + 1) * box_length, grid.rect.y),
@@ -100,7 +101,7 @@ def draw_grid():
                  (grid.rect.x, grid.rect.y, box_length * grid_size, box_length * grid_size), 3)
 
     # Draw guides
-    font_size = box_length * 22 // 48
+    font_size = int(box_length * 22 // 48)
     guides_font = pg.font.Font('segoeui.ttf', font_size)
     spacing_hor = font_size * 1.2
     spacing_vert = font_size * 1.5
@@ -159,6 +160,33 @@ def on_key_down(e):
         kill_sprites_with_tag('inputbox')
 
 
+def on_mousewheel(e):
+    global zoom, margin_topleft, box_length, grid, cross_image
+
+    zoom_speed = 60
+    margin_topleft = min(300 + grid_size * 0.1, margin_topleft - zoom_speed * e.y)
+    box_length = (screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size
+
+    mouse_x, mouse_y = pg.mouse.get_pos()
+    prev_width = grid.rect.width
+    prev_height = grid.rect.height
+    grid.rect.width = box_length * grid_size
+    grid.rect.height = box_length * grid_size
+    grid.rect.x = grid.rect.x * grid.rect.width / prev_width - mouse_x * (grid.rect.width / prev_width - 1)
+    grid.rect.y = grid.rect.y * grid.rect.height / prev_height - mouse_y * (grid.rect.height / prev_height - 1)
+
+    cross_image = pg.transform.scale(orig_cross_image, (box_length, box_length))
+
+
+def on_mouse_motion(e):
+    global margin_topleft
+
+    if e.buttons[1]:
+        delta_x, delta_y = e.rel
+        grid.rect.x = max(-grid.rect.width + 10, min(screen.width - 10, grid.rect.x + delta_x))
+        grid.rect.y += delta_y
+
+
 def on_mouse_pressed():
     mousex, mousey = pg.mouse.get_pos()
     col_clicked = (mousex - grid.rect.x) / box_length
@@ -193,7 +221,7 @@ def load_grid(name):
 
     grid_size = len(solution.matrix)
     margin_topleft = 200 + grid_size * 0.1
-    box_length = int((screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size)
+    box_length = (screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size
     grid = Grid([[0] * grid_size for _ in range(grid_size)],
                 pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
     won = False
@@ -233,7 +261,7 @@ def create_random_grid(size):
 
     grid_size = size
     margin_topleft = 200 + grid_size * 0.1
-    box_length = int((screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size)
+    box_length = (screen.width - MARGIN_BOTTOMRIGHT - margin_topleft) / grid_size
     grid = Grid([[0] * grid_size for _ in range(grid_size)],
                 pg.Rect(margin_topleft, margin_topleft, box_length * grid_size, box_length * grid_size))
     solution = Grid([[0] * grid_size for _ in range(grid_size)],
@@ -266,6 +294,8 @@ clock = pg.time.Clock()
 font = pg.font.Font('segoeui.ttf', 18)
 start_time = time.time()
 elapsed_time = 0
+zoom = 1
+
 orig_cross_image = pg.image.load('cross.png').convert_alpha()
 orig_cross_image.set_colorkey('white')
 
@@ -287,6 +317,8 @@ event_manager.add_listener(pg.QUIT, on_quit)
 event_manager.add_listener(pg.MOUSEBUTTONDOWN, on_mouse_down)
 event_manager.add_listener(pg.MOUSEBUTTONUP, on_mouse_up)
 event_manager.add_listener(pg.KEYDOWN, on_key_down)
+event_manager.add_listener(pg.MOUSEWHEEL, on_mousewheel)
+event_manager.add_listener(pg.MOUSEMOTION, on_mouse_motion)
 
 # UI
 sprites = pg.sprite.Group()
