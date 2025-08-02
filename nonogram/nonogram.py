@@ -103,7 +103,7 @@ def draw_grid():
     # Draw guides
     font_size = int(box_length * 22 // 48)
     guides_font = pg.font.Font('segoeui.ttf', font_size)
-    spacing_hor = font_size * 1.2
+    spacing_hor = font_size * 0.8
     spacing_vert = font_size * 1.5
 
     for i in range(grid_size):
@@ -111,12 +111,14 @@ def draw_grid():
         # If this row matches the solution guides, color the guides gray
         text_color = pg.Color('dark gray') if nums == grid.row_guides[i] else pg.Color('black')
 
+        prev_left = grid.rect.left - 15 + spacing_hor
         for j in range(len(nums)):
             text = str(nums[-1 - j])
             text_surf = guides_font.render(text, True, text_color)
-            text_rect = text_surf.get_rect(right=grid.rect.left - 15 - j * spacing_hor,
+            text_rect = text_surf.get_rect(right=prev_left - spacing_hor,
                                            centery=grid.rect.top + box_length / 2 + i * box_length)
             screen.blit(text_surf, text_rect)
+            prev_left = text_surf.get_rect(right=prev_left - spacing_hor).left
 
     for i in range(grid_size):
         nums = solution.col_guides[i]
@@ -160,6 +162,7 @@ def on_key_down(e):
         kill_sprites_with_tag('inputbox')
 
 
+# Zooming
 def on_mousewheel(e):
     global zoom, margin_topleft, box_length, grid, cross_image
 
@@ -178,13 +181,14 @@ def on_mousewheel(e):
     cross_image = pg.transform.scale(orig_cross_image, (box_length, box_length))
 
 
+# Panning
 def on_mouse_motion(e):
     global margin_topleft
 
     if e.buttons[1]:
         delta_x, delta_y = e.rel
         grid.rect.x = max(-grid.rect.width + 10, min(screen.width - 10, grid.rect.x + delta_x))
-        grid.rect.y += delta_y
+        grid.rect.y = max(-grid.rect.height + 40, min(screen.height - 10, grid.rect.y + delta_y))
 
 
 def on_mouse_pressed():
